@@ -47,16 +47,28 @@
 						<input type="url" class="form-control" id="gitUser" aria-describedby="gitHelp" value="">
 						<div id="gitHelp" class="form-text">Paste Github profile name (not URL) to fetch content from</div>
 
-						<div class="mb-3">
-						  <label for="gitToken" class="form-label">GitHub Token <small>(optional)</small></label>
-						  <input type="password" class="form-control" id="gitToken" placeholder="ghp_...">
-						</div>
-						<div class="form-check mt-2">
-						  <input class="form-check-input" type="checkbox" value="" id="rememberToken">
-						  <label class="form-check-label" for="rememberToken">
-						    Remember my token
-						  </label>
-						</div>
+						<div class="row justify-content-center mt-4">
+					    <div class="col-lg-10">
+					      <label for="gitToken" class="form-label">GitHub Token</label>
+					      <input type="password" class="form-control" id="gitToken" placeholder="ghp_...">
+					      <div class="form-check mt-2">
+					        <input class="form-check-input" type="checkbox" value="" id="rememberToken">
+					        <label class="form-check-label" for="rememberToken">
+					          Remember my token
+					        </label>
+					      </div>
+					      <small class="text-muted">
+					        💡 To get a GitHub token:
+					        <ol class="mt-1 mb-2" style="padding-left: 20px;">
+					          <li>Visit <a href="https://github.com/settings/tokens/new" target="_blank">github.com/settings/tokens/new</a></li>
+					          <li>Give it a name (e.g. <code>Git2Townscaper</code>)</li>
+					          <li><strong>Do not</strong> select any scopes — leave all checkboxes empty</li>
+					          <li>Click <strong>Generate token</strong> and copy the token that appears</li>
+					          <li>Paste it into the field above</li>
+					        </ol>
+					      </small>
+					    </div>
+					  </div>
 						<button id="fetchData" type="button" class="btn btn-primary mt-2">Fetch</button>
 					</div>
 					<div class="mb-4">
