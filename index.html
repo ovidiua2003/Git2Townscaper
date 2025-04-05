@@ -46,6 +46,17 @@
 						<label for="gitUser" class="form-label">Github Username</label>
 						<input type="url" class="form-control" id="gitUser" aria-describedby="gitHelp" value="">
 						<div id="gitHelp" class="form-text">Paste Github profile name (not URL) to fetch content from</div>
+
+						<div class="mb-3">
+						  <label for="gitToken" class="form-label">GitHub Token <small>(optional)</small></label>
+						  <input type="password" class="form-control" id="gitToken" placeholder="ghp_...">
+						</div>
+						<div class="form-check mt-2">
+						  <input class="form-check-input" type="checkbox" value="" id="rememberToken">
+						  <label class="form-check-label" for="rememberToken">
+						    Remember my token
+						  </label>
+						</div>
 						<button id="fetchData" type="button" class="btn btn-primary mt-2">Fetch</button>
 					</div>
 					<div class="mb-4">
@@ -76,138 +87,235 @@
 							<a id="townscaperLink" href="https://oskarstalberg.com/Townscaper/#F" target="_blank">oskarstalberg.com/Townscaper</a>
 						</div>
 					</div>
+					<div class="mt-3">
+					  <button id="saveBuild" class="btn btn-outline-secondary me-2">💾 Save Build</button>
+					  <button id="loadBuild" class="btn btn-outline-secondary">📤 Load Build</button>
+					</div>
 				</div>
 			</div>
-        </div>
+      </div>
 
-        <script type="text/javascript">
+      <script type="text/javascript">
 			let $days = null;
 			let MAX_COLS = 12;
 			let MAX_ROWS = 0;
 			let $grid = null;
 
-			document.querySelector('#fetchData').addEventListener('click', function() {
-				let gitUser = document.querySelector('#gitUser').value.trim();
-				let resDiv = document.querySelector('.fetchResult');
-
-				document.getElementById('generateTownscaper').disabled = true;
-
-				if (gitUser) {
-					if (typeof gtag === 'function') {
-						gtag('event', 'click', {
-							'event_category' : 'button',
-							'event_label' : 'fetchData',
-							'value': 1
-						});
-					}
-					document.querySelector('.fetchResult').innerHTML = '';
-					let url = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://github.com/' + gitUser);
-					fetch(url).then(response => {
-						return response.json();
-					})
-					.then(data => {
-						if (data.status && data.status.http_code == 200) return data;
-						resDiv.innerHTML = '<p class="text-error">No parsable data returned. Please check that the github profile actually has activity.</p>';
-						throw new Error('No parsable data returned.');
-					})
-					.then(data => {
-						const parser = new DOMParser();
-						const $newDoc = parser.parseFromString(data.contents, 'text/html');
-						$days = $newDoc.querySelectorAll('svg.js-calendar-graph-svg rect.ContributionCalendar-day');
-						if ($days.length == 0) {
-							resDiv.innerHTML = '<p class="text-error">No parsable data returned. Please check that the github profile actually has activity.</p>';
-							return;
-						}
-						resDiv.innerHTML = '<p class="text-success">Data found. Click the Generate Button!</p>';
-						$grid = parseGrid($days);
-						MAX_ROWS = Math.max(...$grid);
-
-						document.getElementById('generateTownscaper').disabled = false;
-					}).catch(message => alert);
-				}
-				else {
-					if (typeof gtag === 'function') {
-						gtag('event', 'click', {
-							'event_category' : 'button',
-							'event_label' : 'fetchData',
-							'value': 0
-						});
-					}
-					alert('Not value entered');
+			window.addEventListener('DOMContentLoaded', () => {
+				const savedToken = localStorage.getItem('githubToken');
+				if (savedToken) {
+					document.querySelector('#gitToken').value = savedToken;
+					document.querySelector('#rememberToken').checked = true;
 				}
 			});
 
-			document.querySelector('#generateTownscaper').addEventListener('click', function() {
-				if (typeof gtag === 'function') {
-					gtag('event', 'click', {
-						'event_category' : 'button',
-						'event_label' : 'generateTownscaper'
-					});
-				}
-				const FILL_GAPS = !!document.querySelector('#fillGaps:checked');
-				const REMOVE_GAPS = !!document.querySelector('#removeGaps:checked');
-				let buildingBlocks = [];
-				let successCount = [];
-				let sparse = [];
-				let x = 9;
-				let y = -9;
-				for (let z=0; z<MAX_COLS; z++) {
-					sparse[z] = {'x':x*(z+1), 'y':y, 'voxels':{0:15}};
-				}
-				for (let i=0; i<$grid.length; i++) {
-					let floor = MAX_ROWS-parseInt(i/MAX_COLS);
-					if (parseInt($grid[i]) == MAX_COLS) {
-						if (!successCount[floor]) {
-							successCount[floor] = 1;
-						}
-						else {
-							successCount[floor]++;
-						}
-					}
-					buildingBlocks.push($grid[i]);
-					if (REMOVE_GAPS && successCount[floor] && successCount[floor] == MAX_COLS) {
-						break;
-					}
-				};
+			// Hook into checkbox + token input
+			document.querySelector('#gitToken').addEventListener('input', () => {
+				const token = document.querySelector('#gitToken').value.trim();
+				const remember = document.querySelector('#rememberToken').checked;
 
-				for (let i=0; i<buildingBlocks.length; i++) {
-					let z = i % MAX_COLS;
-					let floor = parseInt(buildingBlocks.length/MAX_COLS)-parseInt(i/MAX_COLS);
-					let color = parseInt(buildingBlocks[i]) > 14 ? 14 : parseInt(buildingBlocks[i]);
-					if (!sparse[z]) {
-						sparse[z] = {'x':x*(z+1), 'y':y, 'voxels':{}};
-					}
-					if (!color) {
-						if (FILL_GAPS) {
-							if (!floor) {
-								sparse[z]['voxels'][floor] = 15;
-							}
-							else {
-								sparse[z]['voxels'][floor] = 14;
-							}
-						}
-					}
-					else {
-						for (let j = 1; j <= buildingBlocks[i]; j++) {
-							sparse[z]['voxels'][j] = !j ? 15 : color;
-						}
-					}
+				if (remember && token) {
+					localStorage.setItem('githubToken', token);
 				}
-				let code = sparseToClip(sparse);
-				document.querySelector('#codeDisplay').value = code;
-				document.querySelector('#townscaperLink').innerText = 'oskarstalberg.com/Townscaper/#' + code;
-				document.querySelector('#townscaperLink').setAttribute('href', 'https://oskarstalberg.com/Townscaper/#' + code);
 			});
 
-			function parseGrid(days)
-			{
-				let out = [0,0,0,0,0,0,0,0,0,0,0,0];
-				days.forEach((day, index) => {
-					let d = new Date(day.dataset.date);
-					out[parseInt(d.getMonth())] += parseInt(day.dataset.level);
+			document.querySelector('#rememberToken').addEventListener('change', () => {
+				const token = document.querySelector('#gitToken').value.trim();
+				const remember = document.querySelector('#rememberToken').checked;
+
+				if (remember && token) {
+					localStorage.setItem('githubToken', token);
+				} else {
+					localStorage.removeItem('githubToken');
+				}
+			});
+
+			async function fetchGraphQLContributions(username, token) {
+				const query = `
+				query {
+				  user(login: "${username}") {
+				    contributionsCollection {
+				      contributionCalendar {
+				        weeks {
+				          contributionDays {
+				            date
+				            contributionCount
+				          }
+				        }
+				      }
+				    }
+				  }
+				}`;
+
+				const res = await fetch("https://api.github.com/graphql", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`
+					},
+					body: JSON.stringify({ query })
 				});
 
-				return out;
+				const data = await res.json();
+
+				if (!data.data?.user?.contributionsCollection?.contributionCalendar) {
+					throw new Error("No contribution data found");
+				}
+
+				const days = data.data.user.contributionsCollection.contributionCalendar.weeks
+					.flatMap(week => week.contributionDays);
+
+				return days.map(day => ({
+					dataset: {
+						date: day.date,
+						count: day.contributionCount,
+						level: String(levelForCommits(day.contributionCount))
+					}
+				}));
+			}
+
+			document.querySelector('#fetchData').addEventListener('click', async function () {
+				const gitUser = document.querySelector('#gitUser').value.trim();
+				const gitToken = document.querySelector('#gitToken')?.value.trim();
+				const resDiv = document.querySelector('.fetchResult');
+				const fetchBtn = document.getElementById('fetchData');
+
+				if (!gitUser || !gitToken) {
+					alert("Please enter both GitHub username and token.");
+					return;
+				}
+
+				fetchBtn.disabled = true;
+				resDiv.innerHTML = `<div class="text-center my-3">
+					<div class="spinner-border text-primary" role="status"></div>
+					<p class="mt-2">Fetching year-long activity from GitHub GraphQL API...</p>
+				</div>`;
+
+				try {
+					const days = await fetchGraphQLContributions(gitUser, gitToken);
+					$grid = parseGrid(days);
+					console.log($grid);
+					MAX_ROWS = Math.max(...$grid);
+					resDiv.innerHTML = `<p class="text-success">Year-long data loaded successfully!</p>`;
+					document.getElementById('generateTownscaper').disabled = false;
+				} catch (err) {
+					console.error(err);
+					resDiv.innerHTML = `<p class="text-danger">Failed to load contribution data.</p>`;
+				}
+
+				fetchBtn.disabled = false;
+			});
+
+
+			document.querySelector('#generateTownscaper').addEventListener('click', function () {
+		    const FILL_GAPS = !!document.querySelector('#fillGaps:checked');
+		    const REMOVE_GAPS = !!document.querySelector('#removeGaps:checked');
+
+		    let sparse = [];
+		    let xSpacing = 9;
+		    let ySpacing = -9;
+		    let maxAllowedHeight = 50;
+
+		    let flatValues = $grid.flat();
+		    let maxActivity = Math.max(...flatValues);
+
+		    for (let month = 0; month < $grid.length; month++) {
+		      for (let week = 0; week < $grid[month].length; week++) {
+		        const raw = $grid[month][week];
+		        if (!raw) continue;
+
+		        const height = Math.min(Math.ceil((raw / maxActivity) * maxAllowedHeight), 255);
+		        const color = colorForLevel(raw);
+
+		        const x = xSpacing * (month + 1);
+		        const y = ySpacing * (week + 1);
+
+		        let building = sparse.find(b => b.x === x && b.y === y);
+		        if (!building) {
+		          building = { x, y, voxels: { 0: 15 } };
+		          sparse.push(building);
+		        }
+
+		        for (let z = 1; z <= height; z++) {
+		          building.voxels[z] = color;
+		        }
+		      }
+		    }
+
+		    let code = sparseToClip(sparse);
+		    document.querySelector('#codeDisplay').value = code;
+		    document.querySelector('#townscaperLink').innerText = 'oskarstalberg.com/Townscaper/#' + code.slice(0, 12) + '...';
+		    document.querySelector('#townscaperLink').setAttribute('href', 'https://oskarstalberg.com/Townscaper/#' + code);
+		  });
+
+			document.querySelector('#saveBuild').addEventListener('click', () => {
+				localStorage.setItem('git2townscaper_code', document.querySelector('#codeDisplay').value);
+				alert('Build saved locally!');
+			});
+
+			document.querySelector('#loadBuild').addEventListener('click', () => {
+				const code = localStorage.getItem('git2townscaper_code');
+				if (code) {
+					document.querySelector('#codeDisplay').value = code;
+					document.querySelector('#townscaperLink').innerText = 'oskarstalberg.com/Townscaper/#' + code;
+					document.querySelector('#townscaperLink').href = 'https://oskarstalberg.com/Townscaper/#' + code;
+					alert('Build loaded!');
+				} else {
+					alert('No saved build found.');
+				}
+			});
+
+			function colorForLevel(level) {
+				if (level >= 200) return 2;   // very high
+				if (level >= 100) return 3;   // high
+				if (level >= 50) return 5;    // medium
+				if (level >= 10) return 7;    // low
+				return 14;                    // very low / inactive
+			}
+
+			function groupEventsByDay(events) {
+			  const counts = {};
+
+			  events.forEach(event => {
+			    const day = event.created_at.split('T')[0]; // e.g., "2025-04-01"
+			    counts[day] = (counts[day] || 0) + 1;
+			  });
+
+			  return counts;
+			}
+
+			function levelForCommits(count) {
+			  // Define your own logic for levels (0–4)
+			  if (count >= 12) return 4;
+			  if (count >= 8) return 3;
+			  if (count >= 4) return 2;
+			  if (count >= 1) return 1;
+			  return 0;
+			}
+
+			function convertToParseGridInput(groupedByDay) {
+			  return Object.entries(groupedByDay).map(([date, count]) => ({
+			    dataset: {
+			      date,
+			      count,
+			      level: String(levelForCommits(count)),
+			    }
+			  }));
+			}
+
+			function parseGrid(days) {
+		    const grid = Array.from({ length: 12 }, () => Array(6).fill(0)); // 12 months x up to 6 weeks
+		    days.forEach(day => {
+		      const d = new Date(day.dataset.date);
+		      const month = d.getMonth();
+		      const week = Math.floor(d.getDate() / 7);
+		      grid[month][week] += parseInt(day.dataset.count);
+		    });
+		    return grid;
+		  }
+
+			function sleep(ms) {
+				return new Promise(resolve => setTimeout(resolve, ms));
 			}
         </script>
     </body>
